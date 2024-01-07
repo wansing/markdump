@@ -1,0 +1,18 @@
+{{define "main"}}
+	<h1>{{.Title}}</h1>
+	{{with .Subdirs}}
+		<ul>
+			{{range .}}
+				<li><a href="{{.LinkURL}}">{{.Title}}</a></li>
+			{{end}}
+		</ul>
+		<hr>
+	{{end}}
+	{{with .Files}}
+		<ul>
+			{{range .}}
+				<li><a href="{{.LinkURL}}">{{.Title}}</a></li>
+			{{end}}
+		</ul>
+	{{end}}
+{{end}}

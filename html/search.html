@@ -1,0 +1,13 @@
+{{define "main"}}
+	<div id="form-search-result">
+		<h1>Search Results</h1>
+		{{with .}}
+			<dl>
+				{{range .}}
+					<dt><a href="{{.Href}}"><strong>{{.Path}}{{.Name}}</strong></a></dt>
+					{{with .Content}}<dd>{{.}}</dd>{{end}}
+				{{end}}
+			</dl>
+		{{end}}
+	</div>
+{{end}}
