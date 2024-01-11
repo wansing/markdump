@@ -281,6 +281,7 @@ func (srv *Server) search(input string) ([]DocumentMatch, error) {
 }
 
 func (srv *Server) Reload() error {
+	// update root and search index
 	indexWriter, err := bluge.OpenWriter(bluge.InMemoryOnlyConfig())
 	if err != nil {
 		return err

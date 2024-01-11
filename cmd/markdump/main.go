@@ -10,12 +10,17 @@ import (
 	"github.com/julienschmidt/httprouter"
 	"github.com/wansing/markdump"
 	"github.com/wansing/markdump/html/static"
+	"github.com/wansing/seal"
 )
 
 func main() {
 	listen := os.Getenv("LISTEN")
 	if listen == "" {
 		listen = "127.0.0.1:8134"
+	}
+	repoDir := os.Getenv("REPO")
+	if repoDir == "" {
+		repoDir = "."
 	}
 	secret := os.Getenv("SECRET")
 	if secret == "" {
@@ -28,7 +33,7 @@ func main() {
 	}
 
 	srv := &markdump.Server{
-		FsDir: "./example",
+		FsDir: repoDir,
 	}
 	if err := srv.Reload(); err != nil {
 		log.Fatalf("error loading: %v", err)
@@ -36,8 +41,9 @@ func main() {
 
 	log.Printf("listening to %s", listen)
 	router := httprouter.New()
+	router.HandlerFunc(http.MethodGet, "/reload", seal.GitReloadHandler(secret, repoDir, srv.Reload))
 	router.Handle(http.MethodGet, "/search/:search", srv.HandleSearchAPI)
 	router.ServeFiles("/static/*filepath", http.FS(static.Files))
-	router.NotFound = srv
+	router.NotFound = srv // chain handlers
 	http.ListenAndServe(listen, router)
 }
