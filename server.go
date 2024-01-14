@@ -8,7 +8,7 @@ import (
 	"log"
 	"net/http"
 	"os"
-	"path/filepath"
+	"path"
 	"sort"
 	"strings"
 
@@ -31,109 +31,103 @@ type Server struct {
 type Dir struct {
 	Path       []*Dir
 	Title      string
-	LinkURL    string
+	URL        string
 	Subdirs    map[string]*Dir
 	SubdirList []*Dir
 	Files      map[string]*File
 	FileList   []*File
 }
 
-// fspath is case-sensitive for reading from filesystem
-func LoadDir(parent *Dir, fsys fs.FS, fspath string, batch *index.Batch) (*Dir, error) {
-	entries, err := fs.ReadDir(fsys, fspath)
+// Load loads subdirs and files of dir.
+func (dir *Dir) Load(fsys fs.FS, batch *index.Batch) error {
+	entries, err := fs.ReadDir(fsys, ".")
 	if err != nil {
-		return nil, err
+		return err
 	}
-
-	var dir = &Dir{}
 
 	var files = map[string]*File{}
 	var subdirs = map[string]*Dir{}
 	for _, entry := range entries {
-		entrypath := filepath.Join(fspath, entry.Name())
-		name := strings.TrimSpace(strings.ToLower(entry.Name()))
-		switch {
-		case strings.HasPrefix(entry.Name(), "."):
-			continue
-
-		case entry.IsDir():
-			subdir, err := LoadDir(dir, fsys, entrypath, batch)
-			if err != nil {
-				return nil, err
+		if strings.HasPrefix(entry.Name(), ".") {
+			continue // skip hidden files
+		}
+		name := strings.TrimSpace(entry.Name())
+		slug := Slugify(name)
+		if entry.IsDir() {
+			subdir := &Dir{
+				Path:  append(dir.Path, dir),
+				Title: name,
+				URL:   path.Join(dir.URL, slug),
 			}
-			subdirs[name] = subdir
+			subfs, err := fs.Sub(fsys, name)
+			if err != nil {
+				return err
+			}
+			if err := subdir.Load(subfs, batch); err != nil {
+				return err
+			}
+			subdirs[slug] = subdir
 
-			doc := bluge.NewDocument(entrypath) // _id
-			doc.AddField(bluge.NewTextField("path", fspath).StoreValue())
+			doc := bluge.NewDocument(subdir.URL) // _id
+			doc.AddField(bluge.NewTextField("path", subdir.PathString()).StoreValue())
 			doc.AddField(bluge.NewTextField("name", entry.Name()).SearchTermPositions().StoreValue())
 			doc.AddField(bluge.NewCompositeFieldIncluding("_all", []string{"name"}))
 			batch.Update(doc.ID(), doc)
-
-		case strings.HasSuffix(name, ".md"):
-			file, err := LoadFile(fsys, entrypath)
+			continue
+		}
+		if strings.HasSuffix(name, ".md") {
+			mdContent, err := fs.ReadFile(fsys, name)
 			if err != nil {
-				return nil, err
+				return err
 			}
-			files[name] = file
+			title := strings.TrimSuffix(name, ".md")
+			slug := Slugify(title)
+			file := &File{
+				Title:       title,
+				HTMLContent: template.HTML(md.RenderToString(mdContent)),
+				URL:         path.Join(dir.URL, slug),
+			}
+			files[slug] = file
 
-			doc := bluge.NewDocument(entrypath) // _id
-			doc.AddField(bluge.NewTextField("path", fspath).StoreValue())
+			doc := bluge.NewDocument(file.URL) // _id
+			doc.AddField(bluge.NewTextField("path", dir.PathString()).StoreValue())
 			doc.AddField(bluge.NewTextField("name", entry.Name()).SearchTermPositions().StoreValue())
-			doc.AddField(bluge.NewTextField("content", file.MdContent).SearchTermPositions().StoreValue())
+			doc.AddField(bluge.NewTextField("content", string(mdContent)).SearchTermPositions().StoreValue())
 			doc.AddField(bluge.NewCompositeFieldIncluding("_all", []string{"name", "content"}))
 			batch.Update(doc.ID(), doc)
 		}
 	}
 
-	var title = filepath.Base(fspath)
-	if title == "." {
-		title = "Home"
-	}
-
 	var subdirList = maps.Values(subdirs)
 	sort.Slice(subdirList, func(i, j int) bool {
-		return subdirList[i].LinkURL < subdirList[j].LinkURL
+		return subdirList[i].URL < subdirList[j].URL
 	})
 
 	var fileList = maps.Values(files)
 	sort.Slice(fileList, func(i, j int) bool {
-		return fileList[i].LinkURL < fileList[j].LinkURL
+		return fileList[i].URL < fileList[j].URL
 	})
 
-	var path []*Dir
-	if parent != nil {
-		path = append(parent.Path, parent)
-	}
-
-	dir.Path = path
-	dir.Title = title
-	dir.LinkURL = fspath
 	dir.Subdirs = subdirs
 	dir.SubdirList = subdirList
 	dir.Files = files
 	dir.FileList = fileList
-	return dir, nil
+	return nil
+}
+
+func (dir *Dir) PathString() string {
+	var sb strings.Builder
+	for _, dir := range dir.Path {
+		sb.WriteString(dir.Title)
+		sb.WriteString(" / ")
+	}
+	return sb.String()
 }
 
 type File struct {
 	Title       string
 	HTMLContent template.HTML
-	MdContent   string
-	LinkURL     string
-}
-
-func LoadFile(fsys fs.FS, fspath string) (*File, error) {
-	bs, err := fs.ReadFile(fsys, fspath)
-	if err != nil {
-		return nil, err
-	}
-	title := strings.TrimSuffix(filepath.Base(fspath), ".md")
-	return &File{
-		Title:       title,
-		HTMLContent: template.HTML(md.RenderToString(bs)),
-		MdContent:   string(bs),
-		LinkURL:     fspath,
-	}, nil
+	URL         string
 }
 
 func (srv *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -168,11 +162,10 @@ func (srv *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	switch len(reqpath) {
 	case 0:
-		err := dirTmpl.Execute(w, dirData{
+		if err := dirTmpl.Execute(w, dirData{
 			Title: dir.Title,
 			Dir:   dir,
-		})
-		if err != nil {
+		}); err != nil {
 			log.Println(err)
 		}
 	case 1:
@@ -182,12 +175,11 @@ func (srv *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			http.NotFound(w, r)
 			return
 		}
-		err := fileTmpl.Execute(w, fileData{
+		if err := fileTmpl.Execute(w, fileData{
 			Title: file.Title,
 			Dir:   dir,
 			File:  file,
-		})
-		if err != nil {
+		}); err != nil {
 			log.Println(err)
 		}
 	default:
@@ -203,6 +195,7 @@ func (srv *Server) HandleSearchHTML(w http.ResponseWriter, r *http.Request, sear
 	}
 	err = searchTmpl.Execute(w, searchData{
 		Title:   "Search: " + search,
+		Search:  search,
 		Matches: matches,
 	})
 	if err != nil {
@@ -268,15 +261,7 @@ func (srv *Server) search(input string) ([]DocumentMatch, error) {
 			case "_id":
 				match.Href = template.URL(value)
 			case "path":
-				var sb strings.Builder
-				for _, item := range strings.FieldsFunc(string(value), func(r rune) bool { return r == '/' }) {
-					if item == "." {
-						continue
-					}
-					sb.WriteString(item)
-					sb.WriteString(" / ")
-				}
-				match.Path = sb.String()
+				match.Path = string(value)
 			case "name":
 				match.Name = template.HTML(value)
 				if locations, ok := next.Locations[field]; ok {
@@ -285,7 +270,6 @@ func (srv *Server) search(input string) ([]DocumentMatch, error) {
 					}
 				}
 			case "content":
-				match.Content = template.HTML(value)
 				if locations, ok := next.Locations[field]; ok {
 					if fragment := highlighter.BestFragment(locations, value); len(fragment) > 0 {
 						match.Content = template.HTML(fragment)
@@ -314,7 +298,12 @@ func (srv *Server) Reload() error {
 		return err
 	}
 	batch := bluge.NewBatch()
-	root, err := LoadDir(nil, os.DirFS(srv.FsDir), ".", batch)
+
+	root := &Dir{
+		Title: "Home",
+		URL:   "/",
+	}
+	err = root.Load(os.DirFS(srv.FsDir), batch)
 	if err != nil {
 		panic(err)
 	}
@@ -325,4 +314,19 @@ func (srv *Server) Reload() error {
 	srv.Root = root
 	srv.Reader, _ = indexWriter.Reader() // reader is a snapshot
 	return nil
+}
+
+// Slugify returns a modified version of the given string in lower case, with [a-z0-9] retained and a dash in each gap.
+func Slugify(s string) string {
+	s = strings.ToLower(s)
+	strs := strings.FieldsFunc(s, func(r rune) bool {
+		if 'a' <= r && r <= 'z' {
+			return false
+		}
+		if '0' <= r && r <= '9' {
+			return false
+		}
+		return true
+	})
+	return strings.Join(strs, "-")
 }

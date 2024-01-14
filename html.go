@@ -19,17 +19,20 @@ var (
 )
 
 type dirData struct {
-	Title string // layout.html
-	Dir   *Dir
+	Title  string // layout.html
+	Search string // layout.html
+	Dir    *Dir
 }
 
 type fileData struct {
-	Title string // layout.html
-	Dir   *Dir   // breadcrumbs
-	File  *File
+	Title  string // layout.html
+	Search string // layout.html
+	Dir    *Dir   // breadcrumbs
+	File   *File
 }
 
 type searchData struct {
 	Title   string // layout.html
+	Search  string // layout.html
 	Matches []DocumentMatch
 }
