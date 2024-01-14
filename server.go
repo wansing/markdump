@@ -17,7 +17,6 @@ import (
 	"github.com/blugelabs/bluge/search/highlight"
 	"github.com/julienschmidt/httprouter"
 	"gitlab.com/golang-commonmark/markdown"
-	"golang.org/x/exp/maps"
 )
 
 var md = markdown.New(markdown.Linkify(true), markdown.Typographer(true))
@@ -28,14 +27,23 @@ type Server struct {
 	Reader *bluge.Reader
 }
 
+type Entry interface {
+	IsDir() bool
+	Title() string
+	URL() string
+}
+
 type Dir struct {
-	Path       []*Dir
-	Title      string
-	URL        string
-	Subdirs    map[string]*Dir
-	SubdirList []*Dir
-	Files      map[string]*File
-	FileList   []*File
+	Path      []*Dir
+	title     string
+	url       string
+	Subdirs   map[string]*Dir
+	Files     map[string]*File
+	EntryList []Entry
+}
+
+func (dir *Dir) IsDir() bool {
+	return true
 }
 
 // Load loads subdirs and files of dir.
@@ -56,8 +64,8 @@ func (dir *Dir) Load(fsys fs.FS, batch *index.Batch) error {
 		if entry.IsDir() {
 			subdir := &Dir{
 				Path:  append(dir.Path, dir),
-				Title: name,
-				URL:   path.Join(dir.URL, slug),
+				title: name,
+				url:   path.Join(dir.url, slug),
 			}
 			subfs, err := fs.Sub(fsys, name)
 			if err != nil {
@@ -68,7 +76,7 @@ func (dir *Dir) Load(fsys fs.FS, batch *index.Batch) error {
 			}
 			subdirs[slug] = subdir
 
-			doc := bluge.NewDocument(subdir.URL) // _id
+			doc := bluge.NewDocument(subdir.url) // _id
 			doc.AddField(bluge.NewTextField("path", subdir.PathString()).StoreValue())
 			doc.AddField(bluge.NewTextField("name", entry.Name()).SearchTermPositions().StoreValue())
 			doc.AddField(bluge.NewCompositeFieldIncluding("_all", []string{"name"}))
@@ -83,13 +91,13 @@ func (dir *Dir) Load(fsys fs.FS, batch *index.Batch) error {
 			title := strings.TrimSuffix(name, ".md")
 			slug := Slugify(title)
 			file := &File{
-				Title:       title,
+				title:       title,
 				HTMLContent: template.HTML(md.RenderToString(mdContent)),
-				URL:         path.Join(dir.URL, slug),
+				url:         path.Join(dir.url, slug),
 			}
 			files[slug] = file
 
-			doc := bluge.NewDocument(file.URL) // _id
+			doc := bluge.NewDocument(file.url) // _id
 			doc.AddField(bluge.NewTextField("path", dir.PathString()).StoreValue())
 			doc.AddField(bluge.NewTextField("name", entry.Name()).SearchTermPositions().StoreValue())
 			doc.AddField(bluge.NewTextField("content", string(mdContent)).SearchTermPositions().StoreValue())
@@ -98,36 +106,56 @@ func (dir *Dir) Load(fsys fs.FS, batch *index.Batch) error {
 		}
 	}
 
-	var subdirList = maps.Values(subdirs)
-	sort.Slice(subdirList, func(i, j int) bool {
-		return subdirList[i].URL < subdirList[j].URL
-	})
-
-	var fileList = maps.Values(files)
-	sort.Slice(fileList, func(i, j int) bool {
-		return fileList[i].URL < fileList[j].URL
+	var entryList = make([]Entry, 0, len(subdirs)+len(files))
+	for _, subdir := range subdirs {
+		entryList = append(entryList, subdir)
+	}
+	for _, file := range files {
+		entryList = append(entryList, file)
+	}
+	sort.Slice(entryList, func(i, j int) bool {
+		return entryList[i].URL() < entryList[j].URL()
 	})
 
 	dir.Subdirs = subdirs
-	dir.SubdirList = subdirList
 	dir.Files = files
-	dir.FileList = fileList
+	dir.EntryList = entryList
 	return nil
 }
 
 func (dir *Dir) PathString() string {
 	var sb strings.Builder
 	for _, dir := range dir.Path {
-		sb.WriteString(dir.Title)
+		sb.WriteString(dir.title)
 		sb.WriteString(" / ")
 	}
 	return sb.String()
 }
 
+func (dir *Dir) Title() string {
+	return dir.title
+}
+
+func (dir *Dir) URL() string {
+	return dir.url
+}
+
 type File struct {
-	Title       string
+	title       string
 	HTMLContent template.HTML
-	URL         string
+	url         string
+}
+
+func (file *File) IsDir() bool {
+	return false
+}
+
+func (file *File) Title() string {
+	return file.title
+}
+
+func (file *File) URL() string {
+	return file.url
 }
 
 func (srv *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -163,7 +191,7 @@ func (srv *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	switch len(reqpath) {
 	case 0:
 		if err := dirTmpl.Execute(w, dirData{
-			Title: dir.Title,
+			Title: dir.title,
 			Dir:   dir,
 		}); err != nil {
 			log.Println(err)
@@ -176,7 +204,7 @@ func (srv *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		if err := fileTmpl.Execute(w, fileData{
-			Title: file.Title,
+			Title: file.title,
 			Dir:   dir,
 			File:  file,
 		}); err != nil {
@@ -300,8 +328,8 @@ func (srv *Server) Reload() error {
 	batch := bluge.NewBatch()
 
 	root := &Dir{
-		Title: "Home",
-		URL:   "/",
+		title: "Home",
+		url:   "/",
 	}
 	err = root.Load(os.DirFS(srv.FsDir), batch)
 	if err != nil {

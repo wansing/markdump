@@ -7,18 +7,10 @@
 			<li class="breadcrumb-item active" aria-current="page">{{.Dir.Title}}</li>
 		</ol>
 	</nav>
-	{{with .Dir.Subdirs}}
+	{{with .Dir.EntryList}}
 		<ul>
 			{{range .}}
-				<li><a href="{{.URL}}">{{.Title}}</a></li>
-			{{end}}
-		</ul>
-		<hr>
-	{{end}}
-	{{with .Dir.Files}}
-		<ul>
-			{{range .}}
-				<li><a href="{{.URL}}">{{.Title}}</a></li>
+				<li {{if not .IsDir}}style="list-style-type: circle;"{{end}}><a href="{{.URL}}">{{.Title}}</a></li>
 			{{end}}
 		</ul>
 	{{end}}
