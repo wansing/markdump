@@ -34,7 +34,7 @@ type Entry interface {
 }
 
 type Dir struct {
-	Path      []*Dir
+	Path      []*Dir // including root
 	title     string
 	url       string
 	Subdirs   map[string]*Dir
@@ -123,10 +123,13 @@ func (dir *Dir) Load(fsys fs.FS, batch *index.Batch) error {
 	return nil
 }
 
+// without root, but with dir
 func (dir *Dir) PathString() string {
+	path := append(dir.Path, dir) // with dir
+	path = path[1:]               // without root
 	var sb strings.Builder
-	for _, dir := range dir.Path {
-		sb.WriteString(dir.title)
+	for _, d := range path {
+		sb.WriteString(d.title)
 		sb.WriteString(" / ")
 	}
 	return sb.String()
