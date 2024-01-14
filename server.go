@@ -132,6 +132,10 @@ func (dir *Dir) PathString() string {
 	return sb.String()
 }
 
+func (dir *Dir) Readme() *File {
+	return dir.Files["readme"]
+}
+
 func (dir *Dir) Title() string {
 	return dir.title
 }

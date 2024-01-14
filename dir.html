@@ -8,10 +8,20 @@
 		</ol>
 	</nav>
 	{{with .Dir.EntryList}}
-		<ul>
+		<ul class="mb-4">
 			{{range .}}
 				<li {{if not .IsDir}}style="list-style-type: circle;"{{end}}><a href="{{.URL}}">{{.Title}}</a></li>
 			{{end}}
 		</ul>
+	{{end}}
+	{{with .Dir.Readme}}
+		<div class="card mb-3">
+			<div class="card-header">
+				{{.Title}}
+			</div>
+			<div class="card-body">
+				{{.HTMLContent}}
+			</div>
+		</div>
 	{{end}}
 {{end}}
