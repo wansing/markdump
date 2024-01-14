@@ -34,6 +34,7 @@ type Entry interface {
 }
 
 type Dir struct {
+	Fsys      fs.FS  // for serving files from subdirs
 	Path      []*Dir // including root
 	title     string
 	url       string
@@ -47,8 +48,8 @@ func (dir *Dir) IsDir() bool {
 }
 
 // Load loads subdirs and files of dir.
-func (dir *Dir) Load(fsys fs.FS, batch *index.Batch) error {
-	entries, err := fs.ReadDir(fsys, ".")
+func (dir *Dir) Load(batch *index.Batch) error {
+	entries, err := fs.ReadDir(dir.Fsys, ".")
 	if err != nil {
 		return err
 	}
@@ -62,16 +63,17 @@ func (dir *Dir) Load(fsys fs.FS, batch *index.Batch) error {
 		name := strings.TrimSpace(entry.Name())
 		slug := Slugify(name)
 		if entry.IsDir() {
+			subfs, err := fs.Sub(dir.Fsys, name)
+			if err != nil {
+				return err
+			}
 			subdir := &Dir{
+				Fsys:  subfs,
 				Path:  append(dir.Path, dir),
 				title: name,
 				url:   path.Join(dir.url, slug),
 			}
-			subfs, err := fs.Sub(fsys, name)
-			if err != nil {
-				return err
-			}
-			if err := subdir.Load(subfs, batch); err != nil {
+			if err := subdir.Load(batch); err != nil {
 				return err
 			}
 			subdirs[slug] = subdir
@@ -84,7 +86,7 @@ func (dir *Dir) Load(fsys fs.FS, batch *index.Batch) error {
 			continue
 		}
 		if strings.HasSuffix(name, ".md") {
-			mdContent, err := fs.ReadFile(fsys, name)
+			mdContent, err := fs.ReadFile(dir.Fsys, name)
 			if err != nil {
 				return err
 			}
@@ -177,9 +179,6 @@ func (srv *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "path too long", http.StatusUnprocessableEntity)
 		return
 	}
-	for i := range reqpath {
-		reqpath[i] = strings.ToLower(strings.TrimSpace(reqpath[i]))
-	}
 
 	// follow dirs
 	var dir = srv.Root
@@ -199,6 +198,7 @@ func (srv *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	case 0:
 		if err := dirTmpl.Execute(w, dirData{
 			Title: dir.title,
+			Base:  dir.url + "/",
 			Dir:   dir,
 		}); err != nil {
 			log.Println(err)
@@ -207,11 +207,14 @@ func (srv *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		slug := reqpath[0]
 		file, ok := dir.Files[slug]
 		if !ok {
-			http.NotFound(w, r)
+			// TODO use ServeFileFS from Go 1.22
+			r.URL.Path = slug
+			http.FileServer(http.FS(dir.Fsys)).ServeHTTP(w, r)
 			return
 		}
 		if err := fileTmpl.Execute(w, fileData{
 			Title: file.title,
+			Base:  dir.url + "/",
 			Dir:   dir,
 			File:  file,
 		}); err != nil {
@@ -335,10 +338,11 @@ func (srv *Server) Reload() error {
 	batch := bluge.NewBatch()
 
 	root := &Dir{
+		Fsys:  os.DirFS(srv.FsDir),
 		title: "Home",
 		url:   "/",
 	}
-	err = root.Load(os.DirFS(srv.FsDir), batch)
+	err = root.Load(batch)
 	if err != nil {
 		panic(err)
 	}
