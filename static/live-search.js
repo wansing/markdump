@@ -44,3 +44,11 @@ function livesearch() {
 	xhr.open("GET", "/search/" + encodeURIComponent(input));
 	xhr.send(null);
 }
+
+document.addEventListener('keydown', evt => {
+    if (evt.key === 'Escape') {
+        let input = document.getElementById("search");
+        input.value = "";
+        input.dispatchEvent(new Event('input')); // update
+    }
+});
