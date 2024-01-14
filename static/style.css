@@ -1,0 +1,5 @@
+/* fix bootstrap blockquote */
+blockquote {
+	padding-left: 0.75em;
+	border-left: 0.25em solid var(--bs-light-border-subtle);
+}
