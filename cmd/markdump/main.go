@@ -9,7 +9,7 @@ import (
 
 	"github.com/julienschmidt/httprouter"
 	"github.com/wansing/markdump"
-	"github.com/wansing/markdump/html/static"
+	"github.com/wansing/markdump/static"
 	"github.com/wansing/seal"
 )
 

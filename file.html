@@ -1,0 +1,14 @@
+{{define "main"}}
+	<nav aria-label="breadcrumb">
+		<ol class="breadcrumb">
+			{{range .Dir.Path}}
+				<li class="breadcrumb-item"><a href="{{.LinkURL}}">{{.Title}}</a></li>
+			{{end}}
+			{{with .Dir}}
+				<li class="breadcrumb-item"><a href="{{.LinkURL}}">{{.Title}}</a></li>
+			{{end}}
+			<li class="breadcrumb-item active" aria-current="page">{{.File.Title}}</li>
+		</ol>
+	</nav>
+	{{.File.HTMLContent}}
+{{end}}

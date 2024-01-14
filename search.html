@@ -1,13 +1,15 @@
 {{define "main"}}
 	<div id="form-search-result">
 		<h1>Search Results</h1>
-		{{with .}}
+		{{with .Matches}}
 			<dl>
 				{{range .}}
 					<dt><a href="{{.Href}}"><strong>{{.Path}}{{.Name}}</strong></a></dt>
 					{{with .Content}}<dd>{{.}}</dd>{{end}}
 				{{end}}
 			</dl>
+		{{else}}
+			<p>No matches.</p>
 		{{end}}
 	</div>
 {{end}}

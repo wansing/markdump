@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"html/template"
 	"io/fs"
+	"log"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -15,7 +16,6 @@ import (
 	"github.com/blugelabs/bluge/index"
 	"github.com/blugelabs/bluge/search/highlight"
 	"github.com/julienschmidt/httprouter"
-	"github.com/wansing/markdump/html"
 	"gitlab.com/golang-commonmark/markdown"
 	"golang.org/x/exp/maps"
 )
@@ -29,6 +29,7 @@ type Server struct {
 }
 
 type Dir struct {
+	Path       []*Dir
 	Title      string
 	LinkURL    string
 	Subdirs    map[string]*Dir
@@ -38,11 +39,13 @@ type Dir struct {
 }
 
 // fspath is case-sensitive for reading from filesystem
-func LoadDir(fsys fs.FS, fspath string, batch *index.Batch) (*Dir, error) {
+func LoadDir(parent *Dir, fsys fs.FS, fspath string, batch *index.Batch) (*Dir, error) {
 	entries, err := fs.ReadDir(fsys, fspath)
 	if err != nil {
 		return nil, err
 	}
+
+	var dir = &Dir{}
 
 	var files = map[string]*File{}
 	var subdirs = map[string]*Dir{}
@@ -54,7 +57,7 @@ func LoadDir(fsys fs.FS, fspath string, batch *index.Batch) (*Dir, error) {
 			continue
 
 		case entry.IsDir():
-			subdir, err := LoadDir(fsys, entrypath, batch)
+			subdir, err := LoadDir(dir, fsys, entrypath, batch)
 			if err != nil {
 				return nil, err
 			}
@@ -84,7 +87,7 @@ func LoadDir(fsys fs.FS, fspath string, batch *index.Batch) (*Dir, error) {
 
 	var title = filepath.Base(fspath)
 	if title == "." {
-		title = ""
+		title = "Home"
 	}
 
 	var subdirList = maps.Values(subdirs)
@@ -97,14 +100,19 @@ func LoadDir(fsys fs.FS, fspath string, batch *index.Batch) (*Dir, error) {
 		return fileList[i].LinkURL < fileList[j].LinkURL
 	})
 
-	return &Dir{
-		Title:      title,
-		LinkURL:    fspath,
-		Subdirs:    subdirs,
-		SubdirList: subdirList,
-		Files:      files,
-		FileList:   fileList,
-	}, nil
+	var path []*Dir
+	if parent != nil {
+		path = append(parent.Path, parent)
+	}
+
+	dir.Path = path
+	dir.Title = title
+	dir.LinkURL = fspath
+	dir.Subdirs = subdirs
+	dir.SubdirList = subdirList
+	dir.Files = files
+	dir.FileList = fileList
+	return dir, nil
 }
 
 type File struct {
@@ -160,7 +168,13 @@ func (srv *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	switch len(reqpath) {
 	case 0:
-		html.Dir.Execute(w, dir)
+		err := dirTmpl.Execute(w, dirData{
+			Title: dir.Title,
+			Dir:   dir,
+		})
+		if err != nil {
+			log.Println(err)
+		}
 	case 1:
 		slug := reqpath[0]
 		file, ok := dir.Files[slug]
@@ -168,7 +182,14 @@ func (srv *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			http.NotFound(w, r)
 			return
 		}
-		html.File.Execute(w, file)
+		err := fileTmpl.Execute(w, fileData{
+			Title: file.Title,
+			Dir:   dir,
+			File:  file,
+		})
+		if err != nil {
+			log.Println(err)
+		}
 	default:
 		http.NotFound(w, r)
 	}
@@ -176,11 +197,17 @@ func (srv *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 func (srv *Server) HandleSearchHTML(w http.ResponseWriter, r *http.Request, search string) {
 	search = strings.TrimSpace(search)
-	result, err := srv.search(search)
+	matches, err := srv.search(search)
 	if err != nil {
 		return
 	}
-	html.Search.Execute(w, result)
+	err = searchTmpl.Execute(w, searchData{
+		Title:   "Search: " + search,
+		Matches: matches,
+	})
+	if err != nil {
+		log.Println(err)
+	}
 }
 
 func (srv *Server) HandleSearchAPI(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
@@ -287,7 +314,7 @@ func (srv *Server) Reload() error {
 		return err
 	}
 	batch := bluge.NewBatch()
-	root, err := LoadDir(os.DirFS(srv.FsDir), ".", batch)
+	root, err := LoadDir(nil, os.DirFS(srv.FsDir), ".", batch)
 	if err != nil {
 		panic(err)
 	}
