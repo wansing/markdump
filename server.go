@@ -82,13 +82,13 @@ func (dir *Dir) Load(batch *index.Batch) error {
 			}
 			if len(subdir.Subdirs) > 0 || len(subdir.Files) > 0 {
 				subdirs[slug] = subdir
-			}
 
-			doc := bluge.NewDocument(subdir.url) // _id
-			doc.AddField(bluge.NewTextField("path", subdir.PathString()).StoreValue())
-			doc.AddField(bluge.NewTextField("name", entry.Name()).SearchTermPositions().StoreValue())
-			doc.AddField(bluge.NewCompositeFieldIncluding("_all", []string{"name"}))
-			batch.Update(doc.ID(), doc)
+				doc := bluge.NewDocument(subdir.url) // _id
+				doc.AddField(bluge.NewTextField("path", subdir.PathString()).StoreValue())
+				doc.AddField(bluge.NewTextField("name", entry.Name()).SearchTermPositions().StoreValue())
+				doc.AddField(bluge.NewCompositeFieldIncluding("_all", []string{"name"}))
+				batch.Update(doc.ID(), doc)
+			}
 			continue
 		}
 		if strings.HasSuffix(name, ".md") {
