@@ -3,3 +3,11 @@ blockquote {
 	padding-left: 0.75em;
 	border-left: 0.25em solid var(--bs-light-border-subtle);
 }
+
+img {
+	max-width: min(30em, 100%);
+	max-height: min(30em, 100%);
+	display: block;
+	margin-left: auto;
+	margin-right: auto;
+}
