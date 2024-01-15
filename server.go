@@ -11,12 +11,16 @@ import (
 	"path"
 	"sort"
 	"strings"
+	"unicode"
 
 	"github.com/blugelabs/bluge"
 	"github.com/blugelabs/bluge/index"
 	"github.com/blugelabs/bluge/search/highlight"
 	"github.com/julienschmidt/httprouter"
 	"gitlab.com/golang-commonmark/markdown"
+	"golang.org/x/text/runes"
+	"golang.org/x/text/transform"
+	"golang.org/x/text/unicode/norm"
 )
 
 var md = markdown.New(markdown.Linkify(true), markdown.Typographer(true))
@@ -357,8 +361,12 @@ func (srv *Server) Reload() error {
 	return nil
 }
 
+// replaces diacritic and accent characters with the underlying character
+var transformer = transform.Chain(norm.NFD, runes.Remove(runes.In(unicode.Mn)), norm.NFC)
+
 // Slugify returns a modified version of the given string in lower case, with [a-z0-9] retained and a dash in each gap.
 func Slugify(s string) string {
+	s, _, _ = transform.String(transformer, s)
 	s = strings.ToLower(s)
 	strs := strings.FieldsFunc(s, func(r rune) bool {
 		if 'a' <= r && r <= 'z' {
