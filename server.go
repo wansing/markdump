@@ -4,11 +4,11 @@ import (
 	"context"
 	"encoding/json"
 	"html/template"
-	"io/fs"
 	"log"
 	"net/http"
 	"os"
 	"path"
+	"path/filepath"
 	"sort"
 	"strings"
 	"unicode"
@@ -38,7 +38,7 @@ type Entry interface {
 }
 
 type Dir struct {
-	Fsys      fs.FS  // for serving files from subdirs
+	FsPath    string // required for serving files by slug
 	Path      []*Dir // including root
 	title     string
 	url       string
@@ -53,7 +53,7 @@ func (dir *Dir) IsDir() bool {
 
 // Load loads subdirs and files of dir.
 func (dir *Dir) Load(batch *index.Batch) error {
-	entries, err := fs.ReadDir(dir.Fsys, ".")
+	entries, err := os.ReadDir(dir.FsPath)
 	if err != nil {
 		return err
 	}
@@ -64,18 +64,14 @@ func (dir *Dir) Load(batch *index.Batch) error {
 		if strings.HasPrefix(entry.Name(), ".") {
 			continue // skip hidden files
 		}
-		name := strings.TrimSpace(entry.Name())
+		name := entry.Name()
 		slug := Slugify(name)
 		if entry.IsDir() {
-			subfs, err := fs.Sub(dir.Fsys, name)
-			if err != nil {
-				return err
-			}
 			subdir := &Dir{
-				Fsys:  subfs,
-				Path:  append(dir.Path, dir),
-				title: name,
-				url:   path.Join(dir.url, slug),
+				FsPath: filepath.Join(dir.FsPath, name),
+				Path:   append(dir.Path, dir),
+				title:  name,
+				url:    path.Join(dir.url, slug),
 			}
 			if err := subdir.Load(batch); err != nil {
 				return err
@@ -92,7 +88,7 @@ func (dir *Dir) Load(batch *index.Batch) error {
 			continue
 		}
 		if strings.HasSuffix(name, ".md") {
-			mdContent, err := fs.ReadFile(dir.Fsys, name)
+			mdContent, err := os.ReadFile(filepath.Join(dir.FsPath, name))
 			if err != nil {
 				return err
 			}
@@ -189,12 +185,12 @@ func (srv *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	// follow dirs
 	var dir = srv.Root
 	for len(reqpath) > 0 {
-		var slug string
-		slug, reqpath = reqpath[0], reqpath[1:]
-		newdir, ok := dir.Subdirs[slug]
+		var key string
+		key, reqpath = reqpath[0], reqpath[1:]
+		newdir, ok := dir.Subdirs[key]
 		if !ok {
 			// restore
-			reqpath = append(reqpath, slug)
+			reqpath = append(reqpath, key)
 			break
 		}
 		dir = newdir
@@ -210,12 +206,10 @@ func (srv *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			log.Println(err)
 		}
 	case 1:
-		slug := reqpath[0]
-		file, ok := dir.Files[slug]
+		key := reqpath[0]
+		file, ok := dir.Files[key]
 		if !ok {
-			// TODO use ServeFileFS from Go 1.22
-			r.URL.Path = slug
-			http.FileServer(http.FS(dir.Fsys)).ServeHTTP(w, r)
+			http.ServeFile(w, r, filepath.Join(dir.FsPath, key))
 			return
 		}
 		if err := fileTmpl.Execute(w, fileData{
@@ -344,9 +338,9 @@ func (srv *Server) Reload() error {
 	batch := bluge.NewBatch()
 
 	root := &Dir{
-		Fsys:  os.DirFS(srv.FsDir),
-		title: "Home",
-		url:   "/",
+		FsPath: srv.FsDir,
+		title:  "Home",
+		url:    "/",
 	}
 	err = root.Load(batch)
 	if err != nil {
@@ -366,6 +360,7 @@ var transformer = transform.Chain(norm.NFD, runes.Remove(runes.In(unicode.Mn)), 
 
 // Slugify returns a modified version of the given string in lower case, with [a-z0-9] retained and a dash in each gap.
 func Slugify(s string) string {
+	s = strings.TrimSpace(s)
 	s, _, _ = transform.String(transformer, s)
 	s = strings.ToLower(s)
 	strs := strings.FieldsFunc(s, func(r rune) bool {
