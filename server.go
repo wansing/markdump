@@ -76,7 +76,9 @@ func (dir *Dir) Load(batch *index.Batch) error {
 			if err := subdir.Load(batch); err != nil {
 				return err
 			}
-			subdirs[slug] = subdir
+			if len(subdir.Subdirs) > 0 || len(subdir.Files) > 0 {
+				subdirs[slug] = subdir
+			}
 
 			doc := bluge.NewDocument(subdir.url) // _id
 			doc.AddField(bluge.NewTextField("path", subdir.PathString()).StoreValue())
