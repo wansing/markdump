@@ -8,7 +8,6 @@ import (
 	"os"
 	"strings"
 
-	"github.com/julienschmidt/httprouter"
 	"github.com/wansing/markdump"
 	"github.com/wansing/markdump/static"
 	"github.com/wansing/seal"
@@ -46,10 +45,9 @@ func main() {
 	}
 
 	log.Printf("listening to %s", listen)
-	router := httprouter.New()
-	router.HandlerFunc(http.MethodGet, "/reload", seal.GitReloadHandler(secret, repoDir, srv.Reload))
-	router.HandlerFunc(http.MethodGet, "/search", srv.HandleSearchAPI)
-	router.ServeFiles("/static/*filepath", http.FS(static.Files))
-	router.NotFound = srv // chain handlers
-	http.ListenAndServe(listen, router)
+	http.Handle("/", srv)                                                                         // TODO "GET /"
+	http.Handle("/static/", http.StripPrefix("/static/", http.FileServer(http.FS(static.Files)))) // TODO "GET /static/"
+	http.HandleFunc("/reload", seal.GitReloadHandler(secret, repoDir, srv.Reload))                // TODO "GET /reload"
+	http.HandleFunc("/search", srv.HandleSearchAPI)                                               // TODO "GET /search"
+	http.ListenAndServe(listen, nil)
 }

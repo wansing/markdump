@@ -4,7 +4,6 @@ go 1.21.5
 
 require (
 	github.com/blugelabs/bluge v0.2.2
-	github.com/julienschmidt/httprouter v1.3.0
 	github.com/wansing/seal v0.0.0-20240111173814-9ef919c16cbd
 	gitlab.com/golang-commonmark/markdown v0.0.0-20211110145824-bf3e522c626a
 	golang.org/x/text v0.14.0
