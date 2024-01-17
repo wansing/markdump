@@ -35,10 +35,15 @@ func main() {
 		secret = base64.RawURLEncoding.EncodeToString(bs)
 		log.Printf("generated temporary reload secret: %s", secret)
 	}
+	title := os.Getenv("TITLE")
+	if title == "" {
+		title = "Home"
+	}
 
 	srv := &markdump.Server{
 		AuthTokens: authTokens,
 		FsDir:      repoDir,
+		Title:      title,
 	}
 	if err := srv.Reload(); err != nil {
 		log.Fatalf("error loading: %v", err)

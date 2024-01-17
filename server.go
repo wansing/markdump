@@ -31,6 +31,7 @@ type Server struct {
 	FsDir      string
 	Root       *Dir
 	Reader     *bluge.Reader
+	Title      string
 }
 
 type Entry interface {
@@ -404,7 +405,7 @@ func (srv *Server) Reload() error {
 
 	root := &Dir{
 		FsPath: srv.FsDir,
-		title:  "Home",
+		title:  srv.Title,
 		url:    "/",
 	}
 	err = root.Load(batch)
