@@ -234,19 +234,16 @@ func (srv *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	// follow dirs
 	var dir = srv.Root
 	for len(reqpath) > 0 {
-		var key string
-		key, reqpath = reqpath[0], reqpath[1:]
-		newdir, ok := dir.Subdirs[key]
+		newdir, ok := dir.Subdirs[reqpath[0]]
 		if !ok {
-			// restore
-			reqpath = append(reqpath, key)
 			break
 		}
 		dir = newdir
+		reqpath = reqpath[1:]
 	}
 
-	switch len(reqpath) {
-	case 0:
+	// serve dir
+	if len(reqpath) == 0 {
 		if err := dirTmpl.Execute(w, dirData{
 			layoutData: layoutData{
 				AuthHref:        authHref,
@@ -258,13 +255,11 @@ func (srv *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		}); err != nil {
 			log.Println(err)
 		}
-	case 1:
-		key := reqpath[0]
-		file, ok := dir.Files[key]
-		if !ok {
-			http.ServeFile(w, r, filepath.Join(dir.FsPath, key))
-			return
-		}
+		return
+	}
+
+	// serve markdown file
+	if file, ok := dir.Files[reqpath[0]]; ok {
 		if err := fileTmpl.Execute(w, fileData{
 			layoutData: layoutData{
 				AuthHref:        authHref,
@@ -277,9 +272,11 @@ func (srv *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		}); err != nil {
 			log.Println(err)
 		}
-	default:
-		http.NotFound(w, r)
+		return
 	}
+
+	// serve other file
+	http.ServeFile(w, r, filepath.Join(dir.FsPath, filepath.Join(reqpath...)))
 }
 
 func (srv *Server) handleSearchHTML(w http.ResponseWriter, r *http.Request, authHref, search string) {
