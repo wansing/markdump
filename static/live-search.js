@@ -41,7 +41,7 @@ function livesearch() {
 			}
 		}
 	};
-	xhr.open("GET", "/search/" + encodeURIComponent(input));
+	xhr.open("GET", "/search?s=" + encodeURIComponent(input));
 	xhr.send(null);
 }
 
