@@ -213,7 +213,7 @@ func (srv *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	if token != "" {
 		var u = *r.URL
 		var query = u.Query()
-		query.Add("auth", token)
+		query.Set("auth", token)
 		u.RawQuery = query.Encode()
 		authHref = u.String()
 	}
