@@ -31,7 +31,7 @@ type Server struct {
 	FsDir      string
 	Root       *Dir
 	Reader     *bluge.Reader
-	Title      string
+	RootTitle  string
 }
 
 type Entry interface {
@@ -295,7 +295,8 @@ func (srv *Server) handleSearchHTML(w http.ResponseWriter, r *http.Request, auth
 			Search:          search,
 			Title:           "Search: " + search,
 		},
-		Matches: matches,
+		Matches:   matches,
+		RootTitle: srv.RootTitle,
 	})
 	if err != nil {
 		log.Println(err)
@@ -405,7 +406,7 @@ func (srv *Server) Reload() error {
 
 	root := &Dir{
 		FsPath: srv.FsDir,
-		title:  srv.Title,
+		title:  srv.RootTitle,
 		url:    "/",
 	}
 	err = root.Load(batch)

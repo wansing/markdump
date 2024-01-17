@@ -39,5 +39,6 @@ type fileData struct {
 
 type searchData struct {
 	layoutData
-	Matches []DocumentMatch
+	Matches   []DocumentMatch
+	RootTitle string
 }
