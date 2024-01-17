@@ -24,7 +24,7 @@ import (
 	"golang.org/x/text/unicode/norm"
 )
 
-var md = markdown.New(markdown.Linkify(true), markdown.Typographer(true))
+var md = markdown.New(markdown.HTML(true), markdown.Linkify(true), markdown.Typographer(true))
 
 type Server struct {
 	AuthTokens []string
