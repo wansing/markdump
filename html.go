@@ -18,24 +18,26 @@ var (
 	searchTmpl = parse("layout.html", "search.html")
 )
 
+type layoutData struct {
+	AuthHref        string
+	Base            string
+	ContainsAuthKey bool
+	Search          string
+	Title           string
+}
+
 type dirData struct {
-	Title  string // layout.html
-	Base   string // layout.html
-	Search string // layout.html
-	Dir    *Dir
+	layoutData
+	Dir *Dir
 }
 
 type fileData struct {
-	Title  string // layout.html
-	Base   string // layout.html
-	Search string // layout.html
-	Dir    *Dir   // breadcrumbs
-	File   *File
+	layoutData
+	Dir  *Dir // breadcrumbs
+	File *File
 }
 
 type searchData struct {
-	Title   string // layout.html
-	Base    string // layout.html
-	Search  string // layout.html
+	layoutData
 	Matches []DocumentMatch
 }

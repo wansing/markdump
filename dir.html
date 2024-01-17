@@ -7,6 +7,9 @@
 			<li class="breadcrumb-item active" aria-current="page">{{.Dir.Title}}</li>
 		</ol>
 	</nav>
+	{{if .ContainsAuthKey}}
+		<div class="alert alert-success text-center">This URL contains an access key. You can bookmark or share it.</div>
+	{{end}}
 	{{with .Dir.EntryList}}
 		<ul class="mb-4">
 			{{range .}}

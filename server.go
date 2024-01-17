@@ -9,14 +9,15 @@ import (
 	"os"
 	"path"
 	"path/filepath"
+	"slices"
 	"sort"
 	"strings"
+	"time"
 	"unicode"
 
 	"github.com/blugelabs/bluge"
 	"github.com/blugelabs/bluge/index"
 	"github.com/blugelabs/bluge/search/highlight"
-	"github.com/julienschmidt/httprouter"
 	"gitlab.com/golang-commonmark/markdown"
 	"golang.org/x/text/runes"
 	"golang.org/x/text/transform"
@@ -26,9 +27,10 @@ import (
 var md = markdown.New(markdown.Linkify(true), markdown.Typographer(true))
 
 type Server struct {
-	FsDir  string
-	Root   *Dir
-	Reader *bluge.Reader
+	AuthTokens []string
+	FsDir      string
+	Root       *Dir
+	Reader     *bluge.Reader
 }
 
 type Entry interface {
@@ -169,9 +171,55 @@ func (file *File) URL() string {
 	return file.url
 }
 
+// returns auth token for AuthHref and whether request is authenticated
+func (srv *Server) authenticated(w http.ResponseWriter, r *http.Request) (string, bool) {
+	if slices.Contains(srv.AuthTokens, "public") {
+		return "", true
+	}
+
+	var token string
+	if cookie, err := r.Cookie("auth"); err == nil {
+		token = cookie.Value
+	}
+
+	if queryToken := r.URL.Query().Get("auth"); queryToken != "" && queryToken != token {
+		// update cookie and var token
+		http.SetCookie(w, &http.Cookie{
+			Name:     "auth",
+			Value:    queryToken,
+			Expires:  time.Now().AddDate(0, 0, 30),
+			Secure:   true,
+			HttpOnly: true,
+			SameSite: http.SameSiteStrictMode,
+		})
+		token = queryToken
+	}
+
+	if slices.Contains(srv.AuthTokens, token) {
+		return token, true
+	} else {
+		return "", false
+	}
+}
+
 func (srv *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	token, authenticated := srv.authenticated(w, r)
+	if !authenticated {
+		http.Error(w, "unauthorized", http.StatusUnauthorized)
+		return
+	}
+
+	var authHref string
+	if token != "" {
+		var u = *r.URL
+		var query = u.Query()
+		query.Add("auth", token)
+		u.RawQuery = query.Encode()
+		authHref = u.String()
+	}
+
 	if search := r.URL.Query().Get("s"); search != "" {
-		srv.HandleSearchHTML(w, r, search)
+		srv.handleSearchHTML(w, r, authHref, search)
 		return
 	}
 
@@ -199,9 +247,13 @@ func (srv *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	switch len(reqpath) {
 	case 0:
 		if err := dirTmpl.Execute(w, dirData{
-			Title: dir.title,
-			Base:  dir.url + "/",
-			Dir:   dir,
+			layoutData: layoutData{
+				AuthHref:        authHref,
+				Base:            dir.url + "/",
+				ContainsAuthKey: r.URL.Query().Has("auth"),
+				Title:           dir.title,
+			},
+			Dir: dir,
 		}); err != nil {
 			log.Println(err)
 		}
@@ -213,10 +265,14 @@ func (srv *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		if err := fileTmpl.Execute(w, fileData{
-			Title: file.title,
-			Base:  dir.url + "/",
-			Dir:   dir,
-			File:  file,
+			layoutData: layoutData{
+				AuthHref:        authHref,
+				Base:            dir.url + "/",
+				ContainsAuthKey: r.URL.Query().Has("auth"),
+				Title:           file.title,
+			},
+			Dir:  dir,
+			File: file,
 		}); err != nil {
 			log.Println(err)
 		}
@@ -225,15 +281,19 @@ func (srv *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func (srv *Server) HandleSearchHTML(w http.ResponseWriter, r *http.Request, search string) {
+func (srv *Server) handleSearchHTML(w http.ResponseWriter, r *http.Request, authHref, search string) {
 	search = strings.TrimSpace(search)
 	matches, err := srv.search(search)
 	if err != nil {
 		return
 	}
 	err = searchTmpl.Execute(w, searchData{
-		Title:   "Search: " + search,
-		Search:  search,
+		layoutData: layoutData{
+			AuthHref:        authHref,
+			ContainsAuthKey: r.URL.Query().Has("auth"),
+			Search:          search,
+			Title:           "Search: " + search,
+		},
 		Matches: matches,
 	})
 	if err != nil {
@@ -241,9 +301,14 @@ func (srv *Server) HandleSearchHTML(w http.ResponseWriter, r *http.Request, sear
 	}
 }
 
-func (srv *Server) HandleSearchAPI(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
-	input := ps.ByName("search")
-	input = strings.TrimPrefix(input, "/") // catch-all parameter value has leading slash
+func (srv *Server) HandleSearchAPI(w http.ResponseWriter, r *http.Request) {
+	_, authenticated := srv.authenticated(w, r)
+	if !authenticated {
+		http.Error(w, "unauthorized", http.StatusUnauthorized)
+		return
+	}
+
+	input := r.URL.Query().Get("s")
 	result, err := srv.search(input)
 	if err != nil {
 		return

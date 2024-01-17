@@ -6,6 +6,7 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"strings"
 
 	"github.com/julienschmidt/httprouter"
 	"github.com/wansing/markdump"
@@ -14,6 +15,10 @@ import (
 )
 
 func main() {
+	authTokens := strings.Fields(os.Getenv("AUTH"))
+	if len(authTokens) == 0 {
+		log.Fatalln("AUTH missing")
+	}
 	listen := os.Getenv("LISTEN")
 	if listen == "" {
 		listen = "127.0.0.1:8134"
@@ -33,7 +38,8 @@ func main() {
 	}
 
 	srv := &markdump.Server{
-		FsDir: repoDir,
+		AuthTokens: authTokens,
+		FsDir:      repoDir,
 	}
 	if err := srv.Reload(); err != nil {
 		log.Fatalf("error loading: %v", err)
@@ -42,7 +48,7 @@ func main() {
 	log.Printf("listening to %s", listen)
 	router := httprouter.New()
 	router.HandlerFunc(http.MethodGet, "/reload", seal.GitReloadHandler(secret, repoDir, srv.Reload))
-	router.Handle(http.MethodGet, "/search/:search", srv.HandleSearchAPI)
+	router.HandlerFunc(http.MethodGet, "/search", srv.HandleSearchAPI)
 	router.ServeFiles("/static/*filepath", http.FS(static.Files))
 	router.NotFound = srv // chain handlers
 	http.ListenAndServe(listen, router)
