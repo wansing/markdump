@@ -242,12 +242,17 @@ func (srv *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		reqpath = reqpath[1:]
 	}
 
+	var base string
+	if dir.url != "" && !strings.HasSuffix(dir.url, "/") {
+		base = dir.url + "/"
+	}
+
 	// serve dir
 	if len(reqpath) == 0 {
 		if err := dirTmpl.Execute(w, dirData{
 			layoutData: layoutData{
 				AuthHref:        authHref,
-				Base:            dir.url + "/",
+				Base:            base,
 				ContainsAuthKey: r.URL.Query().Has("auth"),
 				Title:           dir.title,
 			},
@@ -263,7 +268,7 @@ func (srv *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		if err := fileTmpl.Execute(w, fileData{
 			layoutData: layoutData{
 				AuthHref:        authHref,
-				Base:            dir.url + "/",
+				Base:            base,
 				ContainsAuthKey: r.URL.Query().Has("auth"),
 				Title:           file.title,
 			},
