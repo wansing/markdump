@@ -22,18 +22,18 @@ func main() {
 	if listen == "" {
 		listen = "127.0.0.1:8134"
 	}
-	repoDir := os.Getenv("REPO")
-	if repoDir == "" {
-		repoDir = "."
-	}
-	secret := os.Getenv("SECRET")
-	if secret == "" {
+	reloadSecret := os.Getenv("RELOAD_SECRET")
+	if reloadSecret == "" {
 		var bs = make([]byte, 16)
 		if _, err := rand.Read(bs); err != nil {
 			log.Fatalf("error making random secret: %v", err)
 		}
-		secret = base64.RawURLEncoding.EncodeToString(bs)
-		log.Printf("generated temporary reload secret: %s", secret)
+		reloadSecret = base64.RawURLEncoding.EncodeToString(bs)
+		log.Printf("generated temporary reload secret: %s", reloadSecret)
+	}
+	repoDir := os.Getenv("REPO")
+	if repoDir == "" {
+		repoDir = "."
 	}
 	rootTitle := os.Getenv("TITLE")
 	if rootTitle == "" {
@@ -52,7 +52,7 @@ func main() {
 	log.Printf("listening to %s", listen)
 	http.Handle("GET /", srv)
 	http.Handle("GET /static/", http.StripPrefix("/static/", http.FileServer(http.FS(static.Files))))
-	http.HandleFunc("GET /reload", seal.GitReloadHandler(secret, repoDir, srv.Reload))
+	http.HandleFunc("GET /reload", seal.GitReloadHandler(reloadSecret, repoDir, srv.Reload))
 	http.HandleFunc("GET /search", srv.HandleSearchAPI)
 	http.ListenAndServe(listen, nil)
 }
