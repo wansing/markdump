@@ -49,10 +49,13 @@ func main() {
 		log.Fatalf("error loading: %v", err)
 	}
 
+	reloadHandler := seal.GitReloadHandler(reloadSecret, repoDir, srv.Reload)
+
 	log.Printf("listening to %s", listen)
 	http.Handle("GET /", srv)
 	http.Handle("GET /static/", http.StripPrefix("/static/", http.FileServer(http.FS(static.Files))))
-	http.HandleFunc("/reload", seal.GitReloadHandler(reloadSecret, repoDir, srv.Reload))
+	http.HandleFunc("GET /reload", reloadHandler)
+	http.HandleFunc("POST /reload", reloadHandler)
 	http.HandleFunc("GET /search", srv.HandleSearchAPI)
 	http.ListenAndServe(listen, nil)
 }
