@@ -1,6 +1,6 @@
 module github.com/wansing/markdump
 
-go 1.21.5
+go 1.22
 
 require (
 	github.com/blugelabs/bluge v0.2.2

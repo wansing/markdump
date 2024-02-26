@@ -50,9 +50,9 @@ func main() {
 	}
 
 	log.Printf("listening to %s", listen)
-	http.Handle("/", srv)                                                                         // TODO "GET /"
-	http.Handle("/static/", http.StripPrefix("/static/", http.FileServer(http.FS(static.Files)))) // TODO "GET /static/"
-	http.HandleFunc("/reload", seal.GitReloadHandler(secret, repoDir, srv.Reload))                // TODO "GET /reload"
-	http.HandleFunc("/search", srv.HandleSearchAPI)                                               // TODO "GET /search"
+	http.Handle("GET /", srv)
+	http.Handle("GET /static/", http.StripPrefix("/static/", http.FileServer(http.FS(static.Files))))
+	http.HandleFunc("GET /reload", seal.GitReloadHandler(secret, repoDir, srv.Reload))
+	http.HandleFunc("GET /search", srv.HandleSearchAPI)
 	http.ListenAndServe(listen, nil)
 }
