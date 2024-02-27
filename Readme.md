@@ -27,3 +27,7 @@ AUTH=public RELOAD_SECRET=change-me REPO=content ./markdump
 ```
 
 Then call the reload URL `http://127.0.0.1:8134/reload?secret=change-me`. It will output `git reload failed: git reload has no effect when running in a terminal` because we don't want to mess with git repositories in interactive scenarios.
+
+## Install
+
+Arch Linux users can install [markdump from the AUR](https://aur.archlinux.org/packages/markdump). Have a look [here](https://aur.archlinux.org/cgit/aur.git/tree/?h=markdump) for configuration and systemd service files.
