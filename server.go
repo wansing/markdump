@@ -188,6 +188,7 @@ func (srv *Server) authenticated(w http.ResponseWriter, r *http.Request) (string
 		http.SetCookie(w, &http.Cookie{
 			Name:     "auth",
 			Value:    queryToken,
+			Path:     "/",
 			Expires:  time.Now().AddDate(0, 0, 30),
 			Secure:   true,
 			HttpOnly: true,
