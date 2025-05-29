@@ -16,14 +16,26 @@
 		<link rel="manifest" href="/static/favicon/site.webmanifest">
 	</head>
 	<body>
-		<nav class="navbar bg-body-tertiary mb-3 px-3">
+		<nav class="navbar bg-body-tertiary mb-3">
 			<div class="container">
 				{{with .AuthHref}}
-					<a class="btn btn-outline-success me-3" href="{{.}}">Bookmark and Share</a>
+					<a class="btn btn-outline-success me-3" href="{{.}}">
+						<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512" style="height: 1.6ch">
+							<!--!Font Awesome Free 6.7.2 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free Copyright 2025 Fonticons, Inc.--><path d="M384 336l-192 0c-8.8 0-16-7.2-16-16l0-256c0-8.8 7.2-16 16-16l140.1 0L400 115.9 400 320c0 8.8-7.2 16-16 16zM192 384l192 0c35.3 0 64-28.7 64-64l0-204.1c0-12.7-5.1-24.9-14.1-33.9L366.1 14.1c-9-9-21.2-14.1-33.9-14.1L192 0c-35.3 0-64 28.7-64 64l0 256c0 35.3 28.7 64 64 64zM64 128c-35.3 0-64 28.7-64 64L0 448c0 35.3 28.7 64 64 64l192 0c35.3 0 64-28.7 64-64l0-32-48 0 0 32c0 8.8-7.2 16-16 16L64 464c-8.8 0-16-7.2-16-16l0-256c0-8.8 7.2-16 16-16l32 0 0-48-32 0z"/>
+						</svg>
+						<span class="d-none d-md-inline">Bookmark and Share</span>
+					</a>
 				{{end}}
 				<form class="flex-grow-1 d-flex" role="search" method="get" action="/">
-					<input class="form-control me-2" type="search" id="search" name="s" value="{{.Search}}" placeholder="Search" maxlength="100" oninput="livesearch()" aria-label="Search">
-					<button class="btn btn-outline-success" type="submit">Search</button>
+					<div class="input-group">
+						<input class="form-control" type="search" id="search" name="s" value="{{.Search}}" placeholder="Search" maxlength="100" oninput="livesearch()" aria-label="Search">
+						<button class="btn btn-outline-success" type="submit">
+							<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" style="height: 1.6ch">
+								<!--!Font Awesome Free 6.7.2 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free Copyright 2025 Fonticons, Inc.--><path d="M416 208c0 45.9-14.9 88.3-40 122.7L502.6 457.4c12.5 12.5 12.5 32.8 0 45.3s-32.8 12.5-45.3 0L330.7 376c-34.4 25.2-76.8 40-122.7 40C93.1 416 0 322.9 0 208S93.1 0 208 0S416 93.1 416 208zM208 352a144 144 0 1 0 0-288 144 144 0 1 0 0 288z"/>
+							</svg>
+							<span class="d-none d-md-inline">Search</span>
+						</button>
+					</div>
 				</form>
 			</div>
 		</nav>
