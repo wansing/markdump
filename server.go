@@ -207,7 +207,7 @@ func (srv *Server) authenticated(w http.ResponseWriter, r *http.Request) (string
 func (srv *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	token, authenticated := srv.authenticated(w, r)
 	if !authenticated {
-		http.Error(w, "unauthorized", http.StatusUnauthorized)
+		srv.handleUnauthorized(w, r)
 		return
 	}
 
@@ -309,7 +309,7 @@ func (srv *Server) handleSearchHTML(w http.ResponseWriter, r *http.Request, auth
 func (srv *Server) HandleSearchAPI(w http.ResponseWriter, r *http.Request) {
 	_, authenticated := srv.authenticated(w, r)
 	if !authenticated {
-		http.Error(w, "unauthorized", http.StatusUnauthorized)
+		srv.handleUnauthorized(w, r)
 		return
 	}
 
@@ -319,6 +319,16 @@ func (srv *Server) HandleSearchAPI(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	json.NewEncoder(w).Encode(result)
+}
+
+func (srv *Server) handleUnauthorized(w http.ResponseWriter, r *http.Request) {
+	w.WriteHeader(http.StatusUnauthorized)
+	err := unauthorizedTmpl.Execute(w, layoutData{
+		Title: "Unauthorized",
+	})
+	if err != nil {
+		log.Println(err)
+	}
 }
 
 type DocumentMatch struct {

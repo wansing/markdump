@@ -13,9 +13,10 @@ func parse(fn ...string) *template.Template {
 }
 
 var (
-	dirTmpl    = parse("layout.html", "dir.html")
-	fileTmpl   = parse("layout.html", "file.html")
-	searchTmpl = parse("layout.html", "search.html")
+	dirTmpl          = parse("layout.html", "dir.html")
+	fileTmpl         = parse("layout.html", "file.html")
+	searchTmpl       = parse("layout.html", "search.html")
+	unauthorizedTmpl = parse("layout.html", "unauthorized.html")
 )
 
 type layoutData struct {
