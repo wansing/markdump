@@ -1,6 +1,6 @@
 module github.com/wansing/markdump
 
-go 1.22
+go 1.25
 
 require (
 	github.com/blugelabs/bluge v0.2.2
@@ -24,7 +24,7 @@ require (
 	github.com/caio/go-tdigest v3.1.0+incompatible // indirect
 	github.com/dgryski/go-metro v0.0.0-20180109044635-280f6062b5bc // indirect
 	github.com/golang/snappy v0.0.1 // indirect
-	github.com/klauspost/compress v1.15.2 // indirect
+	github.com/klauspost/compress v1.20.5 // indirect
 	github.com/mattn/go-isatty v0.0.19 // indirect
 	github.com/mschoch/smat v0.2.0 // indirect
 	gitlab.com/golang-commonmark/html v0.0.0-20191124015941-a22733972181 // indirect
